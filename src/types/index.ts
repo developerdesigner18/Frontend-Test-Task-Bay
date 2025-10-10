@@ -18,22 +18,27 @@ export interface Filters {
   setAside: string[];
   vehicle: string;
   agency: string[];
-  periodQuick: string;
-  periodStart: string;
-  periodEnd: string;
-  ceilingMin: string;
-  ceilingMax: string;
+  periodType: 'quick' | 'custom';
+  quickPeriod: number | null;
+  startDate: string;
+  endDate: string;
+  minCeiling: string;
+  maxCeiling: string;
   keywords: string[];
 }
 
-export type SortOption = 'dueDateAsc' | 'dueDateDesc' | 'percentComplete' | 'fitScore';
-
-export interface FilterContextType {
+export interface FilterPreset {
+  name: string;
   filters: Filters;
-  setFilters: (filters: Filters) => void;
-  applyFilters: () => void;
-  resetFilters: () => void;
-  savePreset: () => void;
-  loadPreset: () => void;
-  hasPreset: boolean;
+  savedAt: string;
+}
+
+export type SortOption = 'dueDate-asc' | 'dueDate-desc' | 'percentComplete' | 'fitScore';
+
+export interface StatusCount {
+  Draft: number;
+  Ready: number;
+  Submitted: number;
+  Awarded: number;
+  Lost: number;
 }

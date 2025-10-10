@@ -1,43 +1,28 @@
 import { useState, KeyboardEvent } from 'react';
-import { Filter, RotateCcw, Save, FolderOpen, X } from 'lucide-react';
-import { Filters } from '../types';
+import { Filter, RotateCcw, Save, Upload, X } from 'lucide-react';
+import { useFilters } from '../context/FilterContext';
 import { MultiSelect } from './MultiSelect';
 import { Combobox } from './Combobox';
 
 interface ParameterPanelProps {
-  filters: Filters;
-  onFiltersChange: (filters: Filters) => void;
   onApply: () => void;
-  onReset: () => void;
-  onSavePreset: () => void;
-  onLoadPreset: () => void;
-  hasPreset: boolean;
-  isLoading: boolean;
+  onShowToast: (message: string, type: 'success' | 'info') => void;
 }
 
-const NAICS_OPTIONS = ['541511', '541512', '541513', '541519', '517311'];
-const SET_ASIDE_OPTIONS = ['8(a)', 'WOSB', 'SB', 'SDVOSB', 'VOSB', 'HUBZone'];
-const VEHICLE_OPTIONS = ['GSA MAS', 'Alliant 2', 'CIO-SP3'];
-const AGENCY_OPTIONS = ['GSA', 'USDA', 'DOE', 'HHS', 'VA', 'DHS', 'DOC', 'DOD', 'NOAA', 'SSA'];
-
-export function ParameterPanel({
-  filters,
-  onFiltersChange,
-  onApply,
-  onReset,
-  onSavePreset,
-  onLoadPreset,
-  hasPreset,
-  isLoading,
-}: ParameterPanelProps) {
+export function ParameterPanel({ onApply, onShowToast }: ParameterPanelProps) {
+  const { filters, setFilters, applyFilters, resetFilters, savePreset, loadPreset, hasPreset } = useFilters();
   const [keywordInput, setKeywordInput] = useState('');
-  const [ceilingError, setCeilingError] = useState('');
+
+  const naicsOptions = ['541511', '541512', '541513', '541519', '517311'];
+  const setAsideOptions = ['8(a)', 'WOSB', 'SB', 'SDVOSB', 'VOSB', 'HUBZone'];
+  const vehicleOptions = ['GSA MAS', 'Alliant 2', 'CIO-SP3'];
+  const agencyOptions = ['GSA', 'USDA', 'DOE', 'HHS', 'VA', 'DHS', 'DOC', 'DOD', 'NOAA', 'SSA'];
 
   const handleKeywordKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && keywordInput.trim()) {
       e.preventDefault();
       if (!filters.keywords.includes(keywordInput.trim())) {
-        onFiltersChange({
+        setFilters({
           ...filters,
           keywords: [...filters.keywords, keywordInput.trim()],
         });
@@ -47,56 +32,60 @@ export function ParameterPanel({
   };
 
   const removeKeyword = (keyword: string) => {
-    onFiltersChange({
+    setFilters({
       ...filters,
       keywords: filters.keywords.filter((k) => k !== keyword),
     });
   };
 
-  const handleCeilingChange = (field: 'ceilingMin' | 'ceilingMax', value: string) => {
-    const newFilters = { ...filters, [field]: value };
-    onFiltersChange(newFilters);
-
-    const min = parseFloat(newFilters.ceilingMin || '0');
-    const max = parseFloat(newFilters.ceilingMax || '0');
-
-    if (newFilters.ceilingMin && newFilters.ceilingMax && min > max) {
-      setCeilingError('Min cannot be greater than max');
-    } else {
-      setCeilingError('');
-    }
+  const handleApply = async () => {
+    await applyFilters();
+    onApply();
   };
 
-  const setPeriodQuick = (days: string) => {
-    onFiltersChange({
-      ...filters,
-      periodQuick: days,
-      periodStart: '',
-      periodEnd: '',
-    });
+  const handleReset = () => {
+    resetFilters();
+    onShowToast('Filters reset', 'info');
   };
+
+  const handleSavePreset = () => {
+    savePreset();
+    onShowToast('Preset saved successfully!', 'success');
+  };
+
+  const handleLoadPreset = () => {
+    loadPreset();
+    onShowToast('Preset loaded', 'info');
+  };
+
+  const minCeilingNum = filters.minCeiling ? parseFloat(filters.minCeiling) : null;
+  const maxCeilingNum = filters.maxCeiling ? parseFloat(filters.maxCeiling) : null;
+  const hasError = minCeilingNum !== null && maxCeilingNum !== null && minCeilingNum > maxCeilingNum;
 
   return (
     <div className="bg-white border-r border-slate-200 h-full overflow-y-auto">
-      <div className="p-6 space-y-6">
-        <div className="flex items-center gap-2 pb-4 border-b border-slate-200">
+      <div className="p-6 border-b border-slate-200">
+        <div className="flex items-center gap-2 mb-2">
           <Filter className="w-5 h-5 text-slate-700" />
           <h2 className="text-lg font-semibold text-slate-900">Search Filters</h2>
         </div>
+        <p className="text-sm text-slate-600">Refine your opportunity search</p>
+      </div>
 
-        <div className="space-y-2">
-          <label htmlFor="naics" className="block text-sm font-medium text-slate-700">
+      <div className="p-6 space-y-6">
+        <div>
+          <label htmlFor="naics" className="block text-sm font-medium text-slate-700 mb-2">
             NAICS Code
           </label>
           <select
             id="naics"
             value={filters.naics}
-            onChange={(e) => onFiltersChange({ ...filters, naics: e.target.value })}
-            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+            onChange={(e) => setFilters({ ...filters, naics: e.target.value })}
+            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             aria-label="NAICS Code"
           >
-            <option value="">All NAICS</option>
-            {NAICS_OPTIONS.map((code) => (
+            <option value="">All NAICS Codes</option>
+            {naicsOptions.map((code) => (
               <option key={code} value={code}>
                 {code}
               </option>
@@ -106,25 +95,25 @@ export function ParameterPanel({
 
         <MultiSelect
           label="Set-Aside"
-          options={SET_ASIDE_OPTIONS}
-          value={filters.setAside}
-          onChange={(value) => onFiltersChange({ ...filters, setAside: value })}
-          placeholder="Select set-asides"
+          options={setAsideOptions}
+          selected={filters.setAside}
+          onChange={(selected) => setFilters({ ...filters, setAside: selected })}
+          placeholder="Select set-aside types"
         />
 
-        <div className="space-y-2">
-          <label htmlFor="vehicle" className="block text-sm font-medium text-slate-700">
+        <div>
+          <label htmlFor="vehicle" className="block text-sm font-medium text-slate-700 mb-2">
             Vehicle
           </label>
           <select
             id="vehicle"
             value={filters.vehicle}
-            onChange={(e) => onFiltersChange({ ...filters, vehicle: e.target.value })}
-            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+            onChange={(e) => setFilters({ ...filters, vehicle: e.target.value })}
+            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             aria-label="Vehicle"
           >
             <option value="">All Vehicles</option>
-            {VEHICLE_OPTIONS.map((vehicle) => (
+            {vehicleOptions.map((vehicle) => (
               <option key={vehicle} value={vehicle}>
                 {vehicle}
               </option>
@@ -134,86 +123,148 @@ export function ParameterPanel({
 
         <Combobox
           label="Agency"
-          options={AGENCY_OPTIONS}
-          value={filters.agency}
-          onChange={(value) => onFiltersChange({ ...filters, agency: value })}
+          options={agencyOptions}
+          selected={filters.agency}
+          onChange={(selected) => setFilters({ ...filters, agency: selected })}
           placeholder="Search agencies..."
         />
 
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-slate-700">Period</label>
-          <div className="flex gap-2">
-            {['30', '60', '90'].map((days) => (
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Period
+          </label>
+          <div className="space-y-3">
+            <div className="flex gap-2">
               <button
-                key={days}
                 type="button"
-                onClick={() => setPeriodQuick(days)}
-                className={`flex-1 px-3 py-2 text-sm rounded-md transition-colors ${
-                  filters.periodQuick === days
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                onClick={() =>
+                  setFilters({ ...filters, periodType: 'quick', quickPeriod: 30, startDate: '', endDate: '' })
+                }
+                className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                  filters.periodType === 'quick' && filters.quickPeriod === 30
+                    ? 'bg-blue-50 border-blue-500 text-blue-700'
+                    : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
                 }`}
-                aria-pressed={filters.periodQuick === days}
+                aria-pressed={filters.periodType === 'quick' && filters.quickPeriod === 30}
               >
-                {days} days
+                Next 30 days
               </button>
-            ))}
-          </div>
-          <div className="text-xs text-slate-500 text-center py-1">or</div>
-          <div className="space-y-2">
-            <input
-              type="date"
-              value={filters.periodStart}
-              onChange={(e) =>
-                onFiltersChange({ ...filters, periodStart: e.target.value, periodQuick: '' })
-              }
-              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-              aria-label="Start date"
-            />
-            <input
-              type="date"
-              value={filters.periodEnd}
-              onChange={(e) =>
-                onFiltersChange({ ...filters, periodEnd: e.target.value, periodQuick: '' })
-              }
-              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-              aria-label="End date"
-            />
+              <button
+                type="button"
+                onClick={() =>
+                  setFilters({ ...filters, periodType: 'quick', quickPeriod: 60, startDate: '', endDate: '' })
+                }
+                className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                  filters.periodType === 'quick' && filters.quickPeriod === 60
+                    ? 'bg-blue-50 border-blue-500 text-blue-700'
+                    : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                }`}
+                aria-pressed={filters.periodType === 'quick' && filters.quickPeriod === 60}
+              >
+                Next 60 days
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setFilters({ ...filters, periodType: 'quick', quickPeriod: 90, startDate: '', endDate: '' })
+                }
+                className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                  filters.periodType === 'quick' && filters.quickPeriod === 90
+                    ? 'bg-blue-50 border-blue-500 text-blue-700'
+                    : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                }`}
+                aria-pressed={filters.periodType === 'quick' && filters.quickPeriod === 90}
+              >
+                Next 90 days
+              </button>
+            </div>
+
+            <div className="border-t border-slate-200 pt-3">
+              <p className="text-xs text-slate-600 mb-2">Custom Date Range</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label htmlFor="startDate" className="block text-xs text-slate-600 mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    id="startDate"
+                    type="date"
+                    value={filters.startDate}
+                    onChange={(e) =>
+                      setFilters({ ...filters, periodType: 'custom', quickPeriod: null, startDate: e.target.value })
+                    }
+                    className="w-full px-2 py-1.5 text-sm bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="endDate" className="block text-xs text-slate-600 mb-1">
+                    End Date
+                  </label>
+                  <input
+                    id="endDate"
+                    type="date"
+                    value={filters.endDate}
+                    onChange={(e) =>
+                      setFilters({ ...filters, periodType: 'custom', quickPeriod: null, endDate: e.target.value })
+                    }
+                    className="w-full px-2 py-1.5 text-sm bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-slate-700">Ceiling</label>
-          <div className="space-y-2">
-            <div className="relative">
-              <span className="absolute left-3 top-2 text-slate-500 text-sm">$</span>
-              <input
-                type="number"
-                value={filters.ceilingMin}
-                onChange={(e) => handleCeilingChange('ceilingMin', e.target.value)}
-                placeholder="Min amount"
-                className="w-full pl-7 pr-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                aria-label="Minimum ceiling amount"
-              />
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Ceiling
+          </label>
+          <p className="text-xs text-slate-600 mb-2">Enter amount in USD</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label htmlFor="minCeiling" className="block text-xs text-slate-600 mb-1">
+                Min
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                <input
+                  id="minCeiling"
+                  type="number"
+                  value={filters.minCeiling}
+                  onChange={(e) => setFilters({ ...filters, minCeiling: e.target.value })}
+                  placeholder="0"
+                  className="w-full pl-7 pr-3 py-1.5 text-sm bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  aria-label="Minimum ceiling"
+                />
+              </div>
             </div>
-            <div className="relative">
-              <span className="absolute left-3 top-2 text-slate-500 text-sm">$</span>
-              <input
-                type="number"
-                value={filters.ceilingMax}
-                onChange={(e) => handleCeilingChange('ceilingMax', e.target.value)}
-                placeholder="Max amount"
-                className="w-full pl-7 pr-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                aria-label="Maximum ceiling amount"
-              />
+            <div>
+              <label htmlFor="maxCeiling" className="block text-xs text-slate-600 mb-1">
+                Max
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                <input
+                  id="maxCeiling"
+                  type="number"
+                  value={filters.maxCeiling}
+                  onChange={(e) => setFilters({ ...filters, maxCeiling: e.target.value })}
+                  placeholder="10000000"
+                  className="w-full pl-7 pr-3 py-1.5 text-sm bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  aria-label="Maximum ceiling"
+                />
+              </div>
             </div>
-            {ceilingError && <p className="text-xs text-red-600">{ceilingError}</p>}
-            <p className="text-xs text-slate-500">Enter amount in USD</p>
           </div>
+          {hasError && (
+            <p className="text-xs text-red-600 mt-1" role="alert">
+              Minimum cannot be greater than maximum
+            </p>
+          )}
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="keywords" className="block text-sm font-medium text-slate-700">
+        <div>
+          <label htmlFor="keywords" className="block text-sm font-medium text-slate-700 mb-2">
             Keywords
           </label>
           <input
@@ -223,21 +274,20 @@ export function ParameterPanel({
             onChange={(e) => setKeywordInput(e.target.value)}
             onKeyDown={handleKeywordKeyDown}
             placeholder="Type and press Enter"
-            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             aria-label="Keywords"
           />
           {filters.keywords.length > 0 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mt-2">
               {filters.keywords.map((keyword) => (
                 <span
                   key={keyword}
-                  className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-sm rounded-md"
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
                 >
                   {keyword}
                   <button
-                    type="button"
                     onClick={() => removeKeyword(keyword)}
-                    className="hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                    className="hover:bg-blue-200 rounded-full p-0.5"
                     aria-label={`Remove keyword ${keyword}`}
                   >
                     <X className="w-3 h-3" />
@@ -248,45 +298,44 @@ export function ParameterPanel({
           )}
         </div>
 
-        <div className="space-y-3 pt-4 border-t border-slate-200">
+        <div className="pt-4 space-y-2">
           <button
-            onClick={onApply}
-            disabled={isLoading || !!ceilingError}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-            aria-label="Apply filters"
+            onClick={handleApply}
+            disabled={hasError}
+            className="w-full px-4 py-2 bg-blue-500 text-white font-medium rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
           >
-            {isLoading ? 'Applying...' : 'Apply Filters'}
+            Apply Filters
           </button>
 
           <button
-            onClick={onReset}
-            disabled={isLoading}
-            className="w-full px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-            aria-label="Reset all filters"
+            onClick={handleReset}
+            className="w-full px-4 py-2 bg-white text-slate-700 font-medium rounded-md border border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition-colors"
           >
-            <RotateCcw className="w-4 h-4" />
-            Reset All
+            <div className="flex items-center justify-center gap-2">
+              <RotateCcw className="w-4 h-4" />
+              Reset All
+            </div>
           </button>
 
           <button
-            onClick={onSavePreset}
-            disabled={isLoading}
-            className="w-full px-4 py-2 bg-white text-slate-700 border border-slate-300 rounded-md hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-            aria-label="Save preset"
+            onClick={handleSavePreset}
+            className="w-full px-4 py-2 bg-white text-slate-700 font-medium rounded-md border border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition-colors"
           >
-            <Save className="w-4 h-4" />
-            Save Preset
+            <div className="flex items-center justify-center gap-2">
+              <Save className="w-4 h-4" />
+              Save Preset
+            </div>
           </button>
 
           {hasPreset && (
             <button
-              onClick={onLoadPreset}
-              disabled={isLoading}
-              className="w-full px-4 py-2 bg-white text-slate-700 border border-slate-300 rounded-md hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-              aria-label="Load preset"
+              onClick={handleLoadPreset}
+              className="w-full px-4 py-2 bg-white text-slate-700 font-medium rounded-md border border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition-colors"
             >
-              <FolderOpen className="w-4 h-4" />
-              Load Preset
+              <div className="flex items-center justify-center gap-2">
+                <Upload className="w-4 h-4" />
+                Load Preset
+              </div>
             </button>
           )}
         </div>

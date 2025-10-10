@@ -11,13 +11,14 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T)
     }
   });
 
-  useEffect(() => {
+  const setValue = (value: T) => {
     try {
-      window.localStorage.setItem(key, JSON.stringify(storedValue));
+      setStoredValue(value);
+      window.localStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
       console.error(`Error saving ${key} to localStorage:`, error);
     }
-  }, [key, storedValue]);
+  };
 
-  return [storedValue, setStoredValue];
+  return [storedValue, setValue];
 }

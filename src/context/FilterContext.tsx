@@ -1,61 +1,81 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { Filters, FilterContextType } from '../types';
+import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import { Filters, FilterPreset } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
-const initialFilters: Filters = {
+interface FilterContextType {
+  filters: Filters;
+  setFilters: (filters: Filters) => void;
+  applyFilters: () => Promise<void>;
+  resetFilters: () => void;
+  savePreset: () => void;
+  loadPreset: () => void;
+  hasPreset: boolean;
+  isLoading: boolean;
+}
+
+const defaultFilters: Filters = {
   naics: '',
   setAside: [],
   vehicle: '',
   agency: [],
-  periodQuick: '',
-  periodStart: '',
-  periodEnd: '',
-  ceilingMin: '',
-  ceilingMax: '',
+  periodType: 'quick',
+  quickPeriod: null,
+  startDate: '',
+  endDate: '',
+  minCeiling: '',
+  maxCeiling: '',
   keywords: [],
 };
 
 const FilterContext = createContext<FilterContextType | undefined>(undefined);
 
 export function FilterProvider({ children }: { children: ReactNode }) {
-  const [filters, setFiltersState] = useLocalStorage<Filters>('gsa_filters', initialFilters);
-  const [preset, setPreset] = useLocalStorage<Filters | null>('gsa_preset', null);
-  const [appliedFilters, setAppliedFilters] = useState<Filters>(filters);
+  const [storedFilters, setStoredFilters] = useLocalStorage<Filters>('gsa_filters', defaultFilters);
+  const [preset, setPreset] = useLocalStorage<FilterPreset | null>('gsa_preset', null);
+  const [filters, setFilters] = useState<Filters>(storedFilters);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const setFilters = useCallback((newFilters: Filters) => {
-    setFiltersState(newFilters);
-  }, [setFiltersState]);
+  const applyFilters = useCallback(async () => {
+    setIsLoading(true);
+    setStoredFilters(filters);
 
-  const applyFilters = useCallback(() => {
-    setAppliedFilters(filters);
-  }, [filters]);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    setIsLoading(false);
+  }, [filters, setStoredFilters]);
 
   const resetFilters = useCallback(() => {
-    setFilters(initialFilters);
-    setAppliedFilters(initialFilters);
-  }, [setFilters]);
+    setFilters(defaultFilters);
+    setStoredFilters(defaultFilters);
+  }, [setStoredFilters]);
 
   const savePreset = useCallback(() => {
-    setPreset(filters);
+    const newPreset: FilterPreset = {
+      name: 'Saved Preset',
+      filters: filters,
+      savedAt: new Date().toISOString(),
+    };
+    setPreset(newPreset);
   }, [filters, setPreset]);
 
   const loadPreset = useCallback(() => {
     if (preset) {
-      setFilters(preset);
-      setAppliedFilters(preset);
+      setFilters(preset.filters);
+      setStoredFilters(preset.filters);
     }
-  }, [preset, setFilters]);
+  }, [preset, setStoredFilters]);
 
   return (
     <FilterContext.Provider
       value={{
-        filters: appliedFilters,
+        filters,
         setFilters,
         applyFilters,
         resetFilters,
         savePreset,
         loadPreset,
         hasPreset: preset !== null,
+        isLoading,
       }}
     >
       {children}
@@ -65,8 +85,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
 
 export function useFilters() {
   const context = useContext(FilterContext);
-  if (!context) {
-    throw new Error('useFilters must be used within FilterProvider');
+  if (context === undefined) {
+    throw new Error('useFilters must be used within a FilterProvider');
   }
   return context;
 }

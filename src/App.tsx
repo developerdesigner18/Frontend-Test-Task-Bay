@@ -1,133 +1,30 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Building2 } from 'lucide-react';
-import { Application, Filters } from './types';
-import { FilterProvider } from './context/FilterContext';
-import { useLocalStorage } from './hooks/useLocalStorage';
-import { useURLSync } from './hooks/useURLSync';
-import { filterApplications } from './utils/filterApplications';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { BrowserRouter } from 'react-router-dom';
+import { FilterProvider, useFilters } from './context/FilterContext';
 import { ParameterPanel } from './components/ParameterPanel';
 import { ResultsList } from './components/ResultsList';
 import { DetailsDrawer } from './components/DetailsDrawer';
 import { ProgressDashboard } from './components/ProgressDashboard';
 import { LoadingSkeleton } from './components/LoadingSkeleton';
 import { Toast } from './components/Toast';
+import { Application } from './types';
+import { filterApplications } from './utils/filterApplications';
+import { useURLSync } from './hooks/useURLSync';
+import { Menu, X } from 'lucide-react';
 import applicationsData from './data/applications.json';
 
-interface ToastMessage {
-  id: number;
-  message: string;
-  type: 'success' | 'info';
-}
-
 function AppContent() {
-  const [applications, setApplications] = useLocalStorage<Application[]>(
-    'gsa_applications',
-    applicationsData as Application[]
-  );
-  const [filters, setFilters] = useState<Filters>({
-    naics: '',
-    setAside: [],
-    vehicle: '',
-    agency: [],
-    periodQuick: '',
-    periodStart: '',
-    periodEnd: '',
-    ceilingMin: '',
-    ceilingMax: '',
-    keywords: [],
-  });
-  const [appliedFilters, setAppliedFilters] = useState<Filters>(filters);
+  const { filters, setFilters, isLoading } = useFilters();
+  const [applications, setApplications] = useState<Application[]>(applicationsData as Application[]);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [preset, setPreset] = useLocalStorage<Filters | null>('gsa_preset', null);
-
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { updateURL } = useURLSync(filters, setFilters);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.toString()) {
-      const urlFilters: Filters = {
-        naics: params.get('naics') || '',
-        setAside: params.get('setAside')?.split(',').filter(Boolean) || [],
-        vehicle: params.get('vehicle') || '',
-        agency: params.get('agency')?.split(',').filter(Boolean) || [],
-        periodQuick: params.get('periodQuick') || '',
-        periodStart: params.get('periodStart') || '',
-        periodEnd: params.get('periodEnd') || '',
-        ceilingMin: params.get('ceilingMin') || '',
-        ceilingMax: params.get('ceilingMax') || '',
-        keywords: params.get('keywords')?.split(',').filter(Boolean) || [],
-      };
-      setFilters(urlFilters);
-      setAppliedFilters(urlFilters);
-    }
-  }, []);
-
-  const filteredApplications = useMemo(() => {
-    return filterApplications(applications, appliedFilters);
-  }, [applications, appliedFilters]);
-
-  const handleApplyFilters = useCallback(() => {
-    setIsLoading(true);
     updateURL(filters);
-    setTimeout(() => {
-      setAppliedFilters(filters);
-      setIsLoading(false);
-    }, 500);
-  }, [filters, updateURL]);
-
-  const handleResetFilters = useCallback(() => {
-    const emptyFilters: Filters = {
-      naics: '',
-      setAside: [],
-      vehicle: '',
-      agency: [],
-      periodQuick: '',
-      periodStart: '',
-      periodEnd: '',
-      ceilingMin: '',
-      ceilingMax: '',
-      keywords: [],
-    };
-    setFilters(emptyFilters);
-    setAppliedFilters(emptyFilters);
-    updateURL(emptyFilters);
-  }, [updateURL]);
-
-  const handleSavePreset = useCallback(() => {
-    setPreset(filters);
-    addToast('Preset saved successfully!', 'success');
-  }, [filters, setPreset]);
-
-  const handleLoadPreset = useCallback(() => {
-    if (preset) {
-      setFilters(preset);
-      setAppliedFilters(preset);
-      updateURL(preset);
-      addToast('Preset loaded', 'info');
-    }
-  }, [preset, updateURL]);
-
-  const handleMarkSubmitted = useCallback((app: Application) => {
-    setApplications((prev) =>
-      prev.map((a) =>
-        a.id === app.id
-          ? { ...a, status: 'Submitted' as const, percentComplete: 100 }
-          : a
-      )
-    );
-    addToast('Marked as Submitted', 'info');
-  }, [setApplications]);
-
-  const addToast = (message: string, type: 'success' | 'info') => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, type }]);
-  };
-
-  const removeToast = (id: number) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  };
+  }, [filters]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -142,96 +39,151 @@ function AppContent() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const filteredApplications = useMemo(() => {
+    return filterApplications(applications, filters);
+  }, [applications, filters]);
+
+  const handleSelectApplication = useCallback((app: Application) => {
+    setSelectedApplication(app);
+    setIsDrawerOpen(true);
+  }, []);
+
+  const handleCloseDrawer = useCallback(() => {
+    setIsDrawerOpen(false);
+    setTimeout(() => setSelectedApplication(null), 300);
+  }, []);
+
+  const handleMarkSubmitted = useCallback((id: string) => {
+    setApplications((prev) =>
+      prev.map((app) =>
+        app.id === id
+          ? { ...app, status: 'Submitted' as const, percentComplete: 100 }
+          : app
+      )
+    );
+    setToast({ message: 'Marked as Submitted', type: 'info' });
+  }, []);
+
+  const showToast = useCallback((message: string, type: 'success' | 'info') => {
+    setToast({ message, type });
+  }, []);
+
+  const handleApplyFilters = useCallback(() => {
+    setIsMobileMenuOpen(false);
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div className="px-6 py-4">
-          <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="GSA Opportunity Logo" className="w-20 h-20" />
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">GSA Opportunity</h1>
-              <p className="text-sm text-slate-600">Search and manage government contract opportunities</p>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-blue-500 text-white px-4 py-2 rounded-md z-50"
+      >
+        Skip to content
+      </a>
+
+      <div className="flex h-screen">
+        {/* Admin Panel Sidebar - Light Theme */}
+        <aside className="bg-white border-r border-slate-200 text-slate-800 w-80 flex-shrink-0 h-screen fixed left-0 top-0 overflow-hidden shadow-sm">
+          <div className="p-6 flex flex-col h-full">
+            {/* Title */}
+            <div className="mb-6 text-center border-b border-slate-100 pb-4">
+              <h1 className="text-xl font-bold text-slate-800">GSA Opportunity Finder</h1>
+              <p className="text-sm text-slate-500 mt-1">
+                Search and manage opportunities
+              </p>
+            </div>
+            
+            {/* Filter Panel */}
+            <div className="flex-grow overflow-auto pr-2">
+              <ParameterPanel onApply={handleApplyFilters} onShowToast={showToast} />
             </div>
           </div>
-        </div>
-      </header>
-
-      <div className="flex">
-        <aside className="hidden lg:block w-80 flex-shrink-0 h-[calc(100vh-64px)] sticky top-16">
-          <ParameterPanel
-            filters={filters}
-            onFiltersChange={setFilters}
-            onApply={handleApplyFilters}
-            onReset={handleResetFilters}
-            onSavePreset={handleSavePreset}
-            onLoadPreset={handleLoadPreset}
-            hasPreset={preset !== null}
-            isLoading={isLoading}
-          />
         </aside>
 
-        <div className="flex-1">
+        {/* Main Content */}
+        <div className="ml-80 flex-1 flex flex-col">
+          <header className="bg-white border-b border-slate-200 sticky top-0 z-30 w-full shadow-sm">
+            <div className="px-6 py-3 flex items-center justify-between w-full">
+              <div className="flex items-center">
+                <img src="/logo.png" alt="GSA Logo" className="h-10 mr-4" />
+                <h2 className="text-lg font-semibold text-slate-800">Dashboard</h2>
+              </div>
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="lg:hidden p-2 hover:bg-slate-100 rounded-lg"
+                aria-label="Toggle menu"
+              >
+                {isMobileMenuOpen ? (
+                  <X className="w-6 h-6 text-slate-700" />
+                ) : (
+                  <Menu className="w-6 h-6 text-slate-700" />
+                )}
+              </button>
+            </div>
+          </header>
+
           <ProgressDashboard applications={filteredApplications} />
-          
-          <main className="overflow-y-auto p-6">
-            {isLoading ? (
-              <LoadingSkeleton />
-            ) : (
-              <ResultsList
-                applications={filteredApplications}
-                onSelectApplication={setSelectedApplication}
-                highlightKeywords={appliedFilters.keywords}
-              />
-            )}
+
+          <main id="main-content" className="flex-1 overflow-y-auto">
+            <div className="max-w-7xl mx-auto px-6 py-8">
+              {isLoading ? (
+                <LoadingSkeleton />
+              ) : (
+                <ResultsList
+                  applications={filteredApplications}
+                  onSelectApplication={handleSelectApplication}
+                  highlightKeywords={filters.keywords}
+                />
+              )}
+            </div>
           </main>
         </div>
-      </div>
-
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4">
-        <details className="bg-white">
-          <summary className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium text-center">
-            Show Filters
-          </summary>
-          <div className="mt-4 max-h-[60vh] overflow-y-auto">
-            <ParameterPanel
-              filters={filters}
-              onFiltersChange={setFilters}
-              onApply={handleApplyFilters}
-              onReset={handleResetFilters}
-              onSavePreset={handleSavePreset}
-              onLoadPreset={handleLoadPreset}
-              hasPreset={preset !== null}
-              isLoading={isLoading}
-            />
+        
+        {/* Mobile Menu Overlay */}
+        {isMobileMenuOpen && (
+          <div className="lg:hidden fixed inset-0 bg-slate-800 z-40 overflow-y-auto">
+            <div className="p-4">
+              <div className="flex justify-between items-center mb-6">
+                <img src="/logo.png" alt="GSA Logo" className="h-10" />
+                <button
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-2 text-white"
+                  aria-label="Close menu"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <ParameterPanel onApply={handleApplyFilters} onShowToast={showToast} />
+            </div>
           </div>
-        </details>
+        )}
       </div>
 
       <DetailsDrawer
         application={selectedApplication}
-        onClose={() => setSelectedApplication(null)}
+        isOpen={isDrawerOpen}
+        onClose={handleCloseDrawer}
         onMarkSubmitted={handleMarkSubmitted}
       />
 
-      <div className="fixed top-20 right-6 z-50 space-y-3">
-        {toasts.map((toast) => (
-          <Toast
-            key={toast.id}
-            message={toast.message}
-            type={toast.type}
-            onClose={() => removeToast(toast.id)}
-          />
-        ))}
-      </div>
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }
 
 function App() {
   return (
-    <FilterProvider>
-      <AppContent />
-    </FilterProvider>
+    <BrowserRouter>
+      <FilterProvider>
+        <AppContent />
+      </FilterProvider>
+    </BrowserRouter>
   );
 }
 

@@ -1,15 +1,33 @@
-export function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
 export function getDaysUntil(dateString: string): number {
-  const date = new Date(dateString);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  date.setHours(0, 0, 0, 0);
-  const diff = date.getTime() - today.getTime();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+
+  const targetDate = new Date(dateString);
+  targetDate.setHours(0, 0, 0, 0);
+
+  const diffTime = targetDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  return diffDays;
+}
+
+export function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
+  return date.toLocaleDateString('en-US', options);
+}
+
+export function formatDueDate(dateString: string): string {
+  const daysUntil = getDaysUntil(dateString);
+  const formattedDate = formatDate(dateString);
+
+  if (daysUntil < 0) {
+    return `Overdue by ${Math.abs(daysUntil)} days (${formattedDate})`;
+  } else if (daysUntil === 0) {
+    return `Due today (${formattedDate})`;
+  } else {
+    return `Due in ${daysUntil} days (${formattedDate})`;
+  }
 }
 
 export function isDateInRange(dateString: string, startDate: string, endDate: string): boolean {
@@ -33,6 +51,7 @@ export function formatCurrency(amount: number): string {
     return `$${(amount / 1000000).toFixed(1)}M`;
   } else if (amount >= 1000) {
     return `$${(amount / 1000).toFixed(0)}K`;
+  } else {
+    return `$${amount}`;
   }
-  return `$${amount.toLocaleString()}`;
 }

@@ -1,41 +1,43 @@
 import { useState, useMemo } from 'react';
-import { Search } from 'lucide-react';
 import { Application, SortOption } from '../types';
 import { ResultCard } from './ResultCard';
+import { SearchX } from 'lucide-react';
 import { getDaysUntil } from '../utils/dateHelpers';
 
 interface ResultsListProps {
   applications: Application[];
-  onSelectApplication: (app: Application) => void;
+  onSelectApplication: (application: Application) => void;
   highlightKeywords: string[];
 }
 
 export function ResultsList({ applications, onSelectApplication, highlightKeywords }: ResultsListProps) {
-  const [sortBy, setSortBy] = useState<SortOption>('dueDateAsc');
+  const [sortOption, setSortOption] = useState<SortOption>('dueDate-asc');
 
   const sortedApplications = useMemo(() => {
     const sorted = [...applications];
 
-    switch (sortBy) {
-      case 'dueDateAsc':
-        return sorted.sort((a, b) => getDaysUntil(a.dueDate) - getDaysUntil(b.dueDate));
-      case 'dueDateDesc':
-        return sorted.sort((a, b) => getDaysUntil(b.dueDate) - getDaysUntil(a.dueDate));
+    switch (sortOption) {
+      case 'dueDate-asc':
+        sorted.sort((a, b) => getDaysUntil(a.dueDate) - getDaysUntil(b.dueDate));
+        break;
+      case 'dueDate-desc':
+        sorted.sort((a, b) => getDaysUntil(b.dueDate) - getDaysUntil(a.dueDate));
+        break;
       case 'percentComplete':
-        return sorted.sort((a, b) => b.percentComplete - a.percentComplete);
+        sorted.sort((a, b) => b.percentComplete - a.percentComplete);
+        break;
       case 'fitScore':
-        return sorted.sort((a, b) => b.fitScore - a.fitScore);
-      default:
-        return sorted;
+        sorted.sort((a, b) => b.fitScore - a.fitScore);
+        break;
     }
-  }, [applications, sortBy]);
+
+    return sorted;
+  }, [applications, sortOption]);
 
   if (applications.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 px-6">
-        <div className="bg-slate-100 rounded-full p-6 mb-4">
-          <Search className="w-12 h-12 text-slate-400" />
-        </div>
+      <div className="flex flex-col items-center justify-center py-16 px-4">
+        <SearchX className="w-16 h-16 text-slate-300 mb-4" />
         <h3 className="text-xl font-semibold text-slate-900 mb-2">No opportunities match your criteria</h3>
         <p className="text-slate-600 text-center max-w-md">
           Try adjusting your filters or resetting to see all opportunities
@@ -45,10 +47,10 @@ export function ResultsList({ applications, onSelectApplication, highlightKeywor
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div>
+      <div className="mb-6 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-900">
-          {applications.length} {applications.length === 1 ? 'Opportunity' : 'Opportunities'}
+          {applications.length} {applications.length === 1 ? 'Opportunity' : 'Opportunities'} Found
         </h2>
         <div className="flex items-center gap-2">
           <label htmlFor="sort" className="text-sm text-slate-600">
@@ -56,13 +58,13 @@ export function ResultsList({ applications, onSelectApplication, highlightKeywor
           </label>
           <select
             id="sort"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            value={sortOption}
+            onChange={(e) => setSortOption(e.target.value as SortOption)}
             className="px-3 py-1.5 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             aria-label="Sort opportunities"
           >
-            <option value="dueDateAsc">Due Date (Soonest)</option>
-            <option value="dueDateDesc">Due Date (Latest)</option>
+            <option value="dueDate-asc">Due Date (Earliest First)</option>
+            <option value="dueDate-desc">Due Date (Latest First)</option>
             <option value="percentComplete">% Complete</option>
             <option value="fitScore">Fit Score</option>
           </select>
